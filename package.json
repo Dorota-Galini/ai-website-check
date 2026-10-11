@@ -1,0 +1,23 @@
+{
+  "name": "ai-website-check",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "An AI that walks through a small-business website like a customer and has to back every claim with a verbatim quote.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "check": "tsx src/cli.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

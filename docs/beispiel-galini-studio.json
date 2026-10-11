@@ -1,0 +1,134 @@
+{
+ "sprache": "de",
+ "zeit": "2026-10-11T06:04:30.426Z",
+ "adresse": "https://galini-studio.de/",
+ "domain": "galini-studio.de",
+ "seitenSprache": "de",
+ "punkte": [
+  {
+   "frage": "leistungen",
+   "titel": "Was macht ihr genau, und macht ihr das, was ich brauche?",
+   "ampel": "offen",
+   "satz": "Das kann Herr Entwurf nur mit KI beurteilen, und die war diesmal nicht dabei."
+  },
+  {
+   "frage": "preise",
+   "titel": "Was kostet das ungefähr?",
+   "ampel": "gruen",
+   "satz": "Ich habe Preise gefunden, zum Beispiel „…e mit 3D-Film vom Dachbau und einer Automation für Schadensmeldungen. 2.530 € für die gezeigte Ausführung, Betrieb 48 € im Monat, Einzelpreise auf der Preisse…“",
+   "beleg": {
+    "text": "…e mit 3D-Film vom Dachbau und einer Automation für Schadensmeldungen. 2.530 € für die gezeigte Ausführung, Betrieb 48 € im Monat, Einzelpreise auf der Preisse…",
+    "seite": "https://galini-studio.de/"
+   }
+  },
+  {
+   "frage": "zeiten",
+   "titel": "Wann habt ihr offen oder wann erreiche ich jemanden?",
+   "ampel": "gelb",
+   "satz": "Feste Zeiten habe ich nicht gefunden, aber einen Hinweis: „Innerhalb von 24 Stunden, morgens oder nachmittags.“",
+   "beleg": {
+    "text": "Innerhalb von 24 Stunden, morgens oder nachmittags.",
+    "seite": "https://galini-studio.de/"
+   }
+  },
+  {
+   "frage": "erreichen",
+   "titel": "Wie erreiche ich euch vom Handy aus?",
+   "ampel": "gruen",
+   "satz": "Die Nummer lässt sich am Handy antippen. Per WhatsApp kann ich auch schreiben.",
+   "beleg": {
+    "text": "+49155… („0155 …“)",
+    "seite": "https://galini-studio.de/",
+    "notiz": true
+   }
+  },
+  {
+   "frage": "anfragen",
+   "titel": "Kann ich direkt anfragen oder einen Termin machen?",
+   "ampel": "gruen",
+   "satz": "Es gibt ein Formular, über das ich anfragen kann.",
+   "beleg": {
+    "text": "Formular „Erzähl mir kurz, was du machst.“ mit 9 Feldern, davon 2 Pflichtfelder",
+    "seite": "https://galini-studio.de/",
+    "notiz": true
+   }
+  },
+  {
+   "frage": "ort",
+   "titel": "Wo seid ihr, und kommt ihr auch zu mir?",
+   "ampel": "gruen",
+   "satz": "Die Anschrift steht in den Angaben für Suchmaschinen."
+  },
+  {
+   "frage": "vertrauen",
+   "titel": "Kann ich euch vertrauen? Sehe ich echte Arbeiten, Kundenstimmen oder Nachweise?",
+   "ampel": "offen",
+   "satz": "Das kann Herr Entwurf nur mit KI beurteilen, und die war diesmal nicht dabei."
+  }
+ ],
+ "gefunden": 4,
+ "zaehlbar": 7,
+ "eindruck": [
+  {
+   "thema": "google",
+   "titel": "So steht ihr bei Google",
+   "ampel": "gruen",
+   "text": "Überschrift und Beschreibung sind gesetzt und sagen, worum es geht.",
+   "kurz": "Eintrag bei Google passt",
+   "vorschau": {
+    "titel": "Website erstellen lassen in Lohne und Vechta | Galini Studio",
+    "adresse": "galini-studio.de",
+    "beschreibung": "Ich baue deine Website fertig, bevor du dich entscheiden musst. Erste Seite 650 €, jede weitere 200 €. Aus Lohne, für Betriebe rund um Vechta."
+   }
+  },
+  {
+   "thema": "handy",
+   "titel": "Auf dem Handy",
+   "kurz": "fürs Handy eingerichtet",
+   "ampel": "gruen",
+   "text": "Die Seite ist fürs Handy eingerichtet.",
+   "beleg": {
+    "text": "die Einstellung fürs Handy (viewport) im Kopf der Startseite",
+    "seite": "https://galini-studio.de/",
+    "notiz": true
+   }
+  },
+  {
+   "thema": "aktualitaet",
+   "titel": "Wirkt die Seite gepflegt?",
+   "kurz": "© 2026 im Fuß",
+   "ampel": "gruen",
+   "text": "Unten auf der Seite steht © 2026, das passt."
+  },
+  {
+   "thema": "vorlagen",
+   "titel": "Reste aus der Vorlage",
+   "kurz": "keine Platzhalter aus Vorlagen",
+   "ampel": "gruen",
+   "text": "Platzhalter aus einer Vorlage habe ich nicht gefunden."
+  },
+  {
+   "thema": "links",
+   "titel": "Führen die Links wohin?",
+   "kurz": "alle 13 geprüften Links führen auf eine Seite",
+   "ampel": "gruen",
+   "text": "Alle 13 Links, die ich angeklickt habe, führen auf eine Seite."
+  }
+ ],
+ "lesbarkeit": {
+  "ampel": "gelb",
+  "saetze": [
+   {
+    "ampel": "gelb",
+    "text": "Eckdaten in Maschinensprache gibt es, ohne Zeiten."
+   }
+  ]
+ },
+ "ki": null,
+ "kiStatus": "pause",
+ "weitereSeiten": [
+  "preise",
+  "impressum"
+ ],
+ "nichtGelesen": []
+}

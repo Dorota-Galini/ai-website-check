@@ -1,0 +1,37 @@
+KI-Check: galini-studio.de
+Gelesen: Startseite, Preise, Impressum · 2.1 s · ohne KI (kein Schlüssel oder --ohne-ki)
+
+Der Weg eines Kunden
+  ● Wie steht ihr bei Google?  [kommt weiter]
+    Überschrift und Beschreibung sind gesetzt und sagen, worum es geht.
+    „Website erstellen lassen in Lohne und Vechta | Galini Studio“ · Ich baue deine Website fertig, bevor du dich entscheiden musst. Erste Seite 650 €, jede weitere 200 €. Aus Lohne, für Betriebe rund um Vechta.
+  ● Kann ich die Seite am Handy lesen?  [kommt weiter]
+    Die Seite ist fürs Handy eingerichtet.
+  ◌ Was macht ihr genau, und macht ihr das, was ich brauche?  [bleibt offen]
+    Das kann Herr Entwurf nur mit KI beurteilen, und die war diesmal nicht dabei.
+  ● Was kostet das ungefähr?  [kommt weiter]
+    Ich habe Preise gefunden, zum Beispiel „…e mit 3D-Film vom Dachbau und einer Automation für Schadensmeldungen. 2.530 € für die gezeigte Ausführung, Betrieb 48 € im Monat, Einzelpreise auf der Preisse…“
+    Fundstelle: /
+  ◐ Wann habt ihr offen oder wann erreiche ich jemanden?  [kommt nur mit Mühe weiter]
+    Feste Zeiten habe ich nicht gefunden, aber einen Hinweis: „Innerhalb von 24 Stunden, morgens oder nachmittags.“
+    Fundstelle: /
+  ● Wie erreiche ich euch vom Handy aus?  [kommt weiter]
+    Die Nummer lässt sich am Handy antippen. Per WhatsApp kann ich auch schreiben.
+    +49155… („0155 …“)
+  ● Wo seid ihr, und kommt ihr auch zu mir?  [kommt weiter]
+    Die Anschrift steht in den Angaben für Suchmaschinen.
+  ◌ Kann ich euch vertrauen? Sehe ich echte Arbeiten, Kundenstimmen oder Nachweise?  [bleibt offen]
+    Das kann Herr Entwurf nur mit KI beurteilen, und die war diesmal nicht dabei.
+  ● Kann ich direkt anfragen oder einen Termin machen?  [kommt weiter]
+    Es gibt ein Formular, über das ich anfragen kann.
+    Formular „Erzähl mir kurz, was du machst.“ mit 9 Feldern, davon 2 Pflichtfelder
+
+Unterwegs aufgefallen
+  ● Wirkt die Seite gepflegt?: Unten auf der Seite steht © 2026, das passt.
+  ● Reste aus der Vorlage: Platzhalter aus einer Vorlage habe ich nicht gefunden.
+  ● Führen die Links wohin?: Alle 13 Links, die ich angeklickt habe, führen auf eine Seite.
+
+Können KI-Assistenten die Seite lesen?
+  ◐ Eckdaten in Maschinensprache gibt es, ohne Zeiten.
+
+JSON: docs/beispiel-galini-studio.json
