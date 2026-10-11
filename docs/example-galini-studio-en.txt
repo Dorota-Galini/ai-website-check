@@ -1,0 +1,37 @@
+AI Website Check: galini-studio.de
+Read: Start page, Prices, Legal notice · 2.1 s · without AI (no key, or AI turned off)
+
+A customer’s path
+  ● How do you look on Google?  [gets through]
+    Title and description are set and say what it is about.
+    “Website erstellen lassen in Lohne und Vechta | Galini Studio” · Ich baue deine Website fertig, bevor du dich entscheiden musst. Erste Seite 650 €, jede weitere 200 €. Aus Lohne, für Betriebe rund um Vechta.
+  ● Can I read the site on my phone?  [gets through]
+    The page is set up for phones.
+  ◌ What exactly do you do, and do you do what I need?  [open]
+    Mr Sketch can only judge this with AI, and it was not used this time.
+  ● Roughly what does it cost?  [gets through]
+    I found prices, for example “…e mit 3D-Film vom Dachbau und einer Automation für Schadensmeldungen. 2.530 € für die gezeigte Ausführung, Betrieb 48 € im Monat, Einzelpreise auf der Preisse…”
+    Found on: /
+  ◐ When are you open, or when can I reach someone?  [gets through, with effort]
+    I found no fixed hours, but a hint: “Innerhalb von 24 Stunden, morgens oder nachmittags.”
+    Found on: /
+  ● How do I reach you from my phone?  [gets through]
+    I can tap the number on my phone to call. I can also write on WhatsApp.
+    +49155… („0155 …“)
+  ● Where are you, and do you come to me?  [gets through]
+    The address is in the data for search engines.
+  ◌ Can I trust you? Do I see real work, customer reviews or credentials?  [open]
+    Mr Sketch can only judge this with AI, and it was not used this time.
+  ● Can I send an inquiry or book an appointment right away?  [gets through]
+    There is a form I can use to send an inquiry.
+    form “Erzähl mir kurz, was du machst.” with 9 fields, 2 of them required
+
+Noticed along the way
+  ● Does the site look cared for?: At the bottom of the page it says © 2026, which is fine.
+  ● Leftovers from the template: I found no placeholder text from a template.
+  ● Do the links go somewhere?: All 13 links I clicked lead to a page.
+
+Can AI assistants read the site?
+  ◐ Machine-readable key facts are there, but without hours.
+
+JSON: docs/example-galini-studio-en.json

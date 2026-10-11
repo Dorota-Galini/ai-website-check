@@ -1,5 +1,5 @@
 KI-Check: galini-studio.de
-Gelesen: Startseite, Preise, Impressum · 2.1 s · ohne KI (kein Schlüssel oder --ohne-ki)
+Gelesen: Startseite, Preise, Impressum · 2.5 s · ohne KI (kein Schlüssel oder KI ausgeschaltet)
 
 Der Weg eines Kunden
   ● Wie steht ihr bei Google?  [kommt weiter]

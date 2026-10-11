@@ -8,7 +8,7 @@ Live demo: <https://galini-studio.de/ki-check/> (German) · <https://galini-stud
 
 A customer who wants something done (book a car service, get a roof fixed) goes through a website in a typical order. Can I find you on Google? Can I read the page on my phone? What do you do, and what does it cost? When can I reach someone, and can I tap the number? Where are you? Can I trust you? Can I send an inquiry?
 
-AI Website Check (on the site: "KI-Check", KI is German for AI) goes through these nine stations and shows where a customer **gets stuck**. It runs in under a minute and gives a report as a page and as a PDF. It was built for small businesses in Germany, in German and Polish, as a free tool on the website of a small web studio.
+AI Website Check (on the site: "KI-Check", KI is German for AI) goes through these nine stations and shows where a customer **gets stuck**. It runs in under a minute and gives a report as a page and as a PDF. It was built for small businesses in Germany as a free tool on the website of a small web studio. Reports come in English, German or Polish, from the command line or as a tool for AI assistants (MCP).
 
 ## The rule that matters: no quote, no claim
 
@@ -41,15 +41,44 @@ Needs Node.js 22 or newer.
 
 ```bash
 npm install
-npx tsx src/cli.ts example.com              # report in German
-npx tsx src/cli.ts example.com --pl         # report in Polish
-npx tsx src/cli.ts example.com --json r.json
-npm test                                    # pattern and robots.txt tests, no network
+npx tsx src/cli.ts example.com                 # report in English
+npx tsx src/cli.ts example.com --lang de       # German (or pl for Polish)
+npx tsx src/cli.ts example.com --no-ai --json report.json
+npm test                                       # tests, no network needed
 ```
 
 Without `ANTHROPIC_API_KEY` the check runs with the fixed rules only (free). With a key it adds the AI part (a few cents per check). Please set `KI_CHECK_KENNUNG` to a user agent with your contact (see `.env.example`), so site owners know who is reading. Only check sites you own or have a good reason to check.
 
-An example run (rules only) on the author's own site: [docs/beispiel-galini-studio.txt](docs/beispiel-galini-studio.txt).
+An example run (rules only) on the author's own site: [English](docs/example-galini-studio-en.txt), [German](docs/beispiel-galini-studio.txt).
+
+## Use it from Claude (MCP)
+
+The check also runs as an [MCP](https://modelcontextprotocol.io) server with one tool, `check_website` (`url`, `language`, `use_ai`). Then you can ask Claude Desktop, Claude Code or any other MCP client: *"Check example.com like a customer would."* The tool returns the report as text and as structured data. It is marked read-only.
+
+After `npm install`, add it to **Claude Code** (use your own path):
+
+```bash
+claude mcp add ai-website-check -- node /path/to/ai-website-check/node_modules/tsx/dist/cli.mjs /path/to/ai-website-check/src/mcp.ts
+```
+
+Or to **Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "ai-website-check": {
+      "command": "node",
+      "args": [
+        "C:/path/to/ai-website-check/node_modules/tsx/dist/cli.mjs",
+        "C:/path/to/ai-website-check/src/mcp.ts"
+      ],
+      "env": { "ANTHROPIC_API_KEY": "optional, for the AI part" }
+    }
+  }
+}
+```
+
+Without a key the tool still works with the fixed rules. With a key, the customer reading by Claude comes on top, with the same quote check as everywhere else.
 
 ![The report: each station with the quote it is based on](docs/bericht.png)
 
@@ -61,11 +90,13 @@ An example run (rules only) on the author's own site: [docs/beispiel-galini-stud
 | `src/kunde.ts` | The AI as a customer: prompt, structured output, quote check |
 | `src/bewerten.ts` | Traffic light per question, report sentences in German and Polish |
 | `src/bericht.ts` | What the report contains |
+| `src/pruefen.ts` | One check from start to finish, and the report as text |
 | `src/cli.ts` | Command line |
-| `test/` | Tests for the patterns, the quote check and robots.txt |
+| `src/mcp-server.ts`, `src/mcp.ts` | MCP server with the tool `check_website` |
+| `test/` | Tests for the patterns, the quote check, robots.txt and the MCP server |
 | `docs/EVALUATION.md` | How it was tested |
 
-The code and its comments are in German, like the reports. The comments keep notes from testing ("Testlauf 09.10.2026: …"), so you can see why a rule is the way it is.
+The code and its comments are in German, the reports can be in English, German or Polish. The comments keep notes from testing ("Testlauf 09.10.2026: …"), so you can see why a rule is the way it is.
 
 ## About
 

@@ -8,7 +8,7 @@
 // passt auf). Zwei Runden mit 13 Seiten, kein erfundenes Zitat, siehe
 // docs/EVALUATION.md.
 //
-// Antwortsprache ist die Sprache der Seite, auf der geprüft wird (de/pl),
+// Antwortsprache ist die gewählte Berichtssprache (de/pl/en),
 // egal in welcher Sprache die geprüfte Website ist. Zitate bleiben wörtlich.
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
@@ -67,10 +67,12 @@ export interface KiBericht {
   tokens: { rein: number; raus: number };
 }
 
-function anweisung(sprache: 'de' | 'pl'): string {
+function anweisung(sprache: 'de' | 'pl' | 'en'): string {
   const ausgabe = sprache === 'pl'
     ? 'Schreib branche, auftrag, antwort, eindruck und tipps auf POLNISCH, einfach und freundlich, den Inhaber sprichst du mit „Ty“ an (wie „Du“). Nur das zitat bleibt wörtlich in der Sprache der Website.'
-    : 'Schreib alles auf Deutsch. Das zitat bleibt wörtlich in der Sprache der Website.';
+    : sprache === 'en'
+      ? 'Schreib branche, auftrag, antwort, eindruck und tipps auf ENGLISCH, in einfachem, freundlichem Englisch, den Inhaber sprichst du direkt mit „you“ an. Nur das zitat bleibt wörtlich in der Sprache der Website.'
+      : 'Schreib alles auf Deutsch. Das zitat bleibt wörtlich in der Sprache der Website.';
   return `Du bist Herr Entwurf, die Papierfigur von Galini Studio. Hier spielst du einen ganz normalen Kunden aus der Gegend, der auf der Website eines Betriebs etwas erledigen will. Du hast nur das Material unten: den Text der Website, so wie ihn ein KI-Assistent ohne JavaScript liest, und ein paar Angaben aus dem Quelltext. Du klickst nichts an und schickst nichts ab.
 
 So gehst du vor:
@@ -200,7 +202,7 @@ export type KiFehler = 'kein_schluessel' | 'abgelehnt' | 'api' | 'leer' | 'keine
 
 export async function alsKundeLesen(
   gesammelt: Gesammelt,
-  sprache: 'de' | 'pl',
+  sprache: 'de' | 'pl' | 'en',
   optionen: { fristMs?: number } = {},
 ): Promise<KiBericht | { fehler: KiFehler; info?: string }> {
   if (!process.env.ANTHROPIC_API_KEY) return { fehler: 'kein_schluessel' };

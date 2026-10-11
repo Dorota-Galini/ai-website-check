@@ -13,7 +13,7 @@
 import type { Beleg, Signale } from './sammeln.ts';
 import { FRAGEN_SCHLUESSEL, type Frage, type KiAntwort, type KiBericht } from './kunde.ts';
 
-export type Sprache = 'de' | 'pl';
+export type Sprache = 'de' | 'pl' | 'en';
 export type Ampel = 'gruen' | 'gelb' | 'rot' | 'offen';
 
 export interface Punkt {
@@ -242,14 +242,101 @@ const T = {
     schemaTeile: { tel: 'telefonu', anschrift: 'adresu', zeiten: 'godzin' },
     training: (l: string) => `Dla informacji: do trenowania AI zablokowane są ${l}. To osobna decyzja i nie szkodzi przy zapytaniach klientów.`,
   },
+  en: {
+    fragen: {
+      leistungen: 'What exactly do you do, and do you do what I need?',
+      preise: 'Roughly what does it cost?',
+      zeiten: 'When are you open, or when can I reach someone?',
+      erreichen: 'How do I reach you from my phone?',
+      anfragen: 'Can I send an inquiry or book an appointment right away?',
+      ort: 'Where are you, and do you come to me?',
+      vertrauen: 'Can I trust you? Do I see real work, customer reviews or credentials?',
+    } satisfies Record<Frage, string>,
+    nurMitKi: 'Mr Sketch can only judge this with AI, and it was not used this time.',
+    kiOhneBeleg: 'I read something about this but could not find the exact passage again. So I leave this question open.',
+    kiOhneAntwort: 'I did not find a reliable answer to this one this time.',
+    preiseGefunden: (z: string) => `I found prices, for example ${z}.`,
+    preiseNurPdf: (t: string) => `Prices are only in a PDF file (${t}).`,
+    preiseHinweis: (z: string) => `I found no actual prices, only ${z}.`,
+    preiseKeine: 'I found no prices, not even rough figures.',
+    zeitenDa: (z: string) => `The hours are there: ${z}.`,
+    zeitenFrei: (z: string) => `I found no fixed hours, but a hint: ${z}.`,
+    zeitenVereinbarung: (z: string) => `All I know is ${z}. I did not find when someone answers the phone.`,
+    zeitenKeine: 'I did not find when you are open or when I can reach you.',
+    telAntippbar: 'I can tap the number on my phone to call.',
+    whatsappAuch: 'I can also write on WhatsApp.',
+    telNurText: 'The number is there, but I cannot tap it on my phone. I have to type it in.',
+    nurMail: 'I only found an email address, no phone number.',
+    keinKontakt: 'I found neither a phone number nor an email address.',
+    buchung: 'I can book an appointment online.',
+    formular: 'There is a form I can use to send an inquiry.',
+    formularNotiz: (f: FormularInfo) => (f.dienst
+      ? `embedded form from ${f.dienst}`
+      : `form${f.ueberschrift ? ` “${f.ueberschrift}”` : ''} with ${f.felder} ${f.felder === 1 ? 'field' : 'fields'}${f.pflicht ? `, ${f.pflicht} of them required` : ''}`),
+    perWhatsapp: 'I can send an inquiry via WhatsApp.',
+    nurAnrufen: 'I found no form and no online booking. I would have to call or write an email.',
+    keinWeg: 'I found no way to send you an inquiry.',
+    anschrift: (z: string) => `The address is there: ${z}.`,
+    anschriftDaten: 'The address is in the data for search engines.',
+    anschriftImpressum: (z: string) => `I only found the address in the legal notice (Impressum): ${z}.`,
+    anschriftKeine: 'I did not find an address.',
+    nichtGelesen: (namen: string) => `I could not read the page ${namen}, so I cannot say anything reliable about this.`,
+    nichtGelesenRobots: (namen: string) => `robots.txt blocks the page ${namen} for programs like me. I respect that, so I cannot say anything about this.`,
+    seitennamen: { kontakt: 'Contact', preise: 'Prices', termin: 'Booking', zeiten: 'Opening hours', leistungen: 'Services', impressum: 'Legal notice' } as Record<string, string>,
+    und: ' and ',
+    googleTitel: 'How you look on Google',
+    googleLeer: (t: string) => `In the search results the title is just “${t}”. Nobody can tell from that who you are or what you do.`,
+    googleOhneTitel: 'The page has no title. Google has to make one up.',
+    googleVornLeer: (t: string) => `The title in the search results starts with “${t}”. What you do and where should come first.`,
+    googlePasst: 'The title works.',
+    googleOhneBeschreibung: ' There is no description, so Google shows some random sentence from the page below it.',
+    googleLang: (n: number) => `The title is ${n} characters long. Google shows about 60, the rest is cut off.`,
+    googleGut: 'Title and description are set and say what it is about.',
+    googleKeineBeschreibung: '(no description, so Google takes some sentence from the page)',
+    googleKurz: 'Google listing works',
+    handyTitel: 'On the phone',
+    handyGut: 'The page is set up for phones.',
+    handyNein: 'The page is not set up for phones. It shows up shrunk like on a computer, and you have to zoom with two fingers to read anything.',
+    handyKurz: 'set up for phones',
+    handyBeleg: 'the phone setting (viewport) in the head of the start page',
+    aktuellTitel: 'Does the site look cared for?',
+    aktuellAlt: (j: number) => `At the bottom of the page it says © ${j}. Anyone who sees that wonders whether someone still looks after it.`,
+    aktuellGut: (j: number) => `At the bottom of the page it says © ${j}, which is fine.`,
+    aktuellKurz: (j: number) => `© ${j} in the footer`,
+    vorlagenTitel: 'Leftovers from the template',
+    vorlagenJa: 'There is still placeholder text from the template on the page. Customers stumble over it, and an AI assistant might pass it on as real information.',
+    vorlagenNein: 'I found no placeholder text from a template.',
+    vorlagenKurz: 'no template placeholders',
+    linksTitel: 'Do the links go somewhere?',
+    linksKaputt: (n: number) => (n === 1 ? 'One link leads to an error page.' : `${n} links lead to an error page.`),
+    linksGut: (n: number) => `All ${n} links I clicked lead to a page.`,
+    linksKurz: (n: number) => `all ${n} checked links lead to a page`,
+    linkBeleg: (text: string, url: string, status: number) => `${text || 'Link'}: ${url} (error ${status})`,
+    robotsKlassisch: (l: string) => `robots.txt also blocks normal search engines (${l}). Then hardly anyone finds you there.`,
+    robotsKi: (l: string) => `robots.txt blocks AI search (${l}). People who ask ChatGPT, Claude or Perplexity about a business will hear about you less often.`,
+    nurMitWww: (d: string) => `Without “www” in front, the page does not open. Anyone who types just ${d} ends up nowhere.`,
+    noindex: 'The start page asks search engines not to include it (noindex).',
+    ohneJs: 'Without JavaScript the start page is almost empty. Many AI readers then see next to nothing.',
+    frames: 'The page is built with frames. That is a very old technique, and search engines struggle with the sub-pages.',
+    ohneHttps: 'The page runs without https. Browsers then show “not secure”.',
+    schemaFehlt: 'The key facts are missing in machine-readable form (schema.org: name, address, phone, hours). With them, Google and AI assistants read them more reliably.',
+    schemaTeils: (f: string[]) => `Machine-readable key facts are there, but without ${f.join(', ')}.`,
+    schemaGut: 'The key facts are also there in machine-readable form (schema.org).',
+    schemaTeile: { tel: 'phone', anschrift: 'address', zeiten: 'hours' },
+    training: (l: string) => `For your information: ${l} are blocked from AI training. That is a separate decision and does not hurt customer inquiries.`,
+  },
 };
 
 type Texte = (typeof T)['de'];
 
 // ── Regeln ──────────────────────────────────────────────────────────────
 
-const zitat = (b: Beleg | undefined, sprache: Sprache) =>
-  b ? (sprache === 'pl' ? `„${b.text.replace(/^[„"]|[”“"]$/g, '')}”` : `„${b.text.replace(/^[„"]|[“"]$/g, '')}“`) : '';
+// Anführungszeichen je Sprache: „…“ deutsch, „…” polnisch, “…” englisch.
+const zitat = (b: Beleg | undefined, sprache: Sprache) => {
+  if (!b) return '';
+  const text = b.text.replace(/^[„"“]|[“”"]$/g, '');
+  return sprache === 'pl' ? `„${text}”` : sprache === 'en' ? `“${text}”` : `„${text}“`;
+};
 const istImpressum = (b: Beleg, s: Signale) => s.seiten.find((x) => x.url === b.seite)?.art === 'impressum';
 
 function nachRegeln(s: Signale, sprache: Sprache): Punkt[] {

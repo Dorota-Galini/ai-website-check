@@ -1,0 +1,134 @@
+{
+ "sprache": "en",
+ "zeit": "2026-10-11T11:01:55.767Z",
+ "adresse": "https://galini-studio.de/",
+ "domain": "galini-studio.de",
+ "seitenSprache": "de",
+ "punkte": [
+  {
+   "frage": "leistungen",
+   "titel": "What exactly do you do, and do you do what I need?",
+   "ampel": "offen",
+   "satz": "Mr Sketch can only judge this with AI, and it was not used this time."
+  },
+  {
+   "frage": "preise",
+   "titel": "Roughly what does it cost?",
+   "ampel": "gruen",
+   "satz": "I found prices, for example “…e mit 3D-Film vom Dachbau und einer Automation für Schadensmeldungen. 2.530 € für die gezeigte Ausführung, Betrieb 48 € im Monat, Einzelpreise auf der Preisse…”",
+   "beleg": {
+    "text": "…e mit 3D-Film vom Dachbau und einer Automation für Schadensmeldungen. 2.530 € für die gezeigte Ausführung, Betrieb 48 € im Monat, Einzelpreise auf der Preisse…",
+    "seite": "https://galini-studio.de/"
+   }
+  },
+  {
+   "frage": "zeiten",
+   "titel": "When are you open, or when can I reach someone?",
+   "ampel": "gelb",
+   "satz": "I found no fixed hours, but a hint: “Innerhalb von 24 Stunden, morgens oder nachmittags.”",
+   "beleg": {
+    "text": "Innerhalb von 24 Stunden, morgens oder nachmittags.",
+    "seite": "https://galini-studio.de/"
+   }
+  },
+  {
+   "frage": "erreichen",
+   "titel": "How do I reach you from my phone?",
+   "ampel": "gruen",
+   "satz": "I can tap the number on my phone to call. I can also write on WhatsApp.",
+   "beleg": {
+    "text": "+49155… („0155 …“)",
+    "seite": "https://galini-studio.de/",
+    "notiz": true
+   }
+  },
+  {
+   "frage": "anfragen",
+   "titel": "Can I send an inquiry or book an appointment right away?",
+   "ampel": "gruen",
+   "satz": "There is a form I can use to send an inquiry.",
+   "beleg": {
+    "text": "form “Erzähl mir kurz, was du machst.” with 9 fields, 2 of them required",
+    "seite": "https://galini-studio.de/",
+    "notiz": true
+   }
+  },
+  {
+   "frage": "ort",
+   "titel": "Where are you, and do you come to me?",
+   "ampel": "gruen",
+   "satz": "The address is in the data for search engines."
+  },
+  {
+   "frage": "vertrauen",
+   "titel": "Can I trust you? Do I see real work, customer reviews or credentials?",
+   "ampel": "offen",
+   "satz": "Mr Sketch can only judge this with AI, and it was not used this time."
+  }
+ ],
+ "gefunden": 4,
+ "zaehlbar": 7,
+ "eindruck": [
+  {
+   "thema": "google",
+   "titel": "How you look on Google",
+   "ampel": "gruen",
+   "text": "Title and description are set and say what it is about.",
+   "kurz": "Google listing works",
+   "vorschau": {
+    "titel": "Website erstellen lassen in Lohne und Vechta | Galini Studio",
+    "adresse": "galini-studio.de",
+    "beschreibung": "Ich baue deine Website fertig, bevor du dich entscheiden musst. Erste Seite 650 €, jede weitere 200 €. Aus Lohne, für Betriebe rund um Vechta."
+   }
+  },
+  {
+   "thema": "handy",
+   "titel": "On the phone",
+   "kurz": "set up for phones",
+   "ampel": "gruen",
+   "text": "The page is set up for phones.",
+   "beleg": {
+    "text": "the phone setting (viewport) in the head of the start page",
+    "seite": "https://galini-studio.de/",
+    "notiz": true
+   }
+  },
+  {
+   "thema": "aktualitaet",
+   "titel": "Does the site look cared for?",
+   "kurz": "© 2026 in the footer",
+   "ampel": "gruen",
+   "text": "At the bottom of the page it says © 2026, which is fine."
+  },
+  {
+   "thema": "vorlagen",
+   "titel": "Leftovers from the template",
+   "kurz": "no template placeholders",
+   "ampel": "gruen",
+   "text": "I found no placeholder text from a template."
+  },
+  {
+   "thema": "links",
+   "titel": "Do the links go somewhere?",
+   "kurz": "all 13 checked links lead to a page",
+   "ampel": "gruen",
+   "text": "All 13 links I clicked lead to a page."
+  }
+ ],
+ "lesbarkeit": {
+  "ampel": "gelb",
+  "saetze": [
+   {
+    "ampel": "gelb",
+    "text": "Machine-readable key facts are there, but without hours."
+   }
+  ]
+ },
+ "ki": null,
+ "kiStatus": "pause",
+ "weitereSeiten": [
+  "preise",
+  "impressum"
+ ],
+ "nichtGelesen": []
+}

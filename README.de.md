@@ -35,11 +35,15 @@ Vor dem Start an 13 Seiten getestet, jedes Ergebnis von Hand geprüft (`docs/EVA
 
 ```bash
 npm install
-npx tsx src/cli.ts beispiel.de
+npx tsx src/cli.ts beispiel.de --lang de    # Bericht auf Deutsch (en ist Standard, pl Polnisch)
 npm test
 ```
 
-Ohne `ANTHROPIC_API_KEY` nur die festen Regeln (kostenlos), mit Schlüssel auch die KI. Bitte eine eigene Kennung mit Kontakt setzen (`KI_CHECK_KENNUNG`, siehe `.env.example`).
+Ohne `ANTHROPIC_API_KEY` nur die festen Regeln (kostenlos), mit Schlüssel auch die KI.
+
+## Als Werkzeug für Claude (MCP)
+
+Der Check läuft auch als MCP-Server mit einem Werkzeug, `check_website` (Adresse, Sprache, KI an oder aus). Dann kann man Claude Desktop oder Claude Code einfach fragen: „Prüf beispiel.de wie ein Kunde.“ Wie man ihn einträgt, steht in der englischen Anleitung (`README.md`, Abschnitt „Use it from Claude (MCP)“). Bitte eine eigene Kennung mit Kontakt setzen (`KI_CHECK_KENNUNG`, siehe `.env.example`).
 
 ## Über mich
 
