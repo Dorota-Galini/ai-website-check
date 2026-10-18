@@ -41,6 +41,15 @@ const TEXTE = {
 // Dieselben Formen wie auf der Seite: voll, halb, leer (offener Ring), gestrichelt.
 const ZEICHEN = { gruen: '●', gelb: '◐', rot: '○', offen: '◌' } as const;
 
+// Eine kaputte Adresse im Beleg darf den Bericht nicht abbrechen.
+const pfad = (adresse: string) => {
+  try {
+    return new URL(adresse).pathname;
+  } catch {
+    return adresse;
+  }
+};
+
 export type Fehler = NonNullable<Signale['fehler']>;
 export type Ergebnis =
   | { bericht: KiCheckBericht; kiStatus: KiStatus; dauerMs: number }
@@ -89,7 +98,7 @@ export function alsText(e: { bericht: KiCheckBericht; kiStatus: KiStatus; dauerM
     if (!p) continue;
     // Steht das Zitat schon im Satz, nur noch die Seite nennen.
     const imSatz = !!p.beleg && p.satz.includes(p.beleg.text.slice(0, 40));
-    const beleg = !p.beleg ? undefined : p.beleg.notiz ? p.beleg.text : imSatz ? `${TEXT.fundstelle}: ${new URL(p.beleg.seite).pathname}` : `${TEXT.q(p.beleg.text)} (${new URL(p.beleg.seite).pathname})`;
+    const beleg = !p.beleg ? undefined : p.beleg.notiz ? p.beleg.text : imSatz ? `${TEXT.fundstelle}: ${pfad(p.beleg.seite)}` : `${TEXT.q(p.beleg.text)} (${pfad(p.beleg.seite)})`;
     station(ZEICHEN[p.passtNicht ? 'offen' : p.ampel], p.titel, urteil(p.ampel, p.passtNicht), p.satz, beleg);
   }
   const nebenbei = bericht.eindruck.filter((x) => x.thema !== 'google' && x.thema !== 'handy');

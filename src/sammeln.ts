@@ -16,9 +16,11 @@
 // ihre eigene Seite ist.
 //
 // Schutz: nur öffentliche Server,
-// höchstens 4 Weiterleitungen, 8 Sekunden und 800 KB je Seite.
+// höchstens 4 Weiterleitungen, 8 Sekunden und 3 MB je Seite.
+import { lookup as dnsLookup, type LookupAddress, type LookupOptions } from 'node:dns';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
+import { Agent, fetch, type RequestInit } from 'undici';
 
 // Wer den Check selbst betreibt, setzt eine eigene Kennung mit Kontakt
 // (KI_CHECK_KENNUNG), damit Betreiber geprüfter Seiten wissen, wer anfragt.
@@ -131,13 +133,67 @@ function ipv4Intern(ip: string): boolean {
   );
 }
 
-function ipIntern(ip: string): boolean {
-  if (isIP(ip) === 4) return ipv4Intern(ip);
-  const klein = ip.toLowerCase();
-  const gemappt = klein.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (gemappt) return ipv4Intern(gemappt[1]);
-  return klein === '::' || klein === '::1' || /^f[cd]/.test(klein) || /^fe[89ab]/.test(klein) || /^ff/.test(klein);
+/** IPv6 als acht Zahlen, auch mit „::“ und IPv4-Schwanz („::ffff:1.2.3.4“). */
+function ipv6Teile(ip: string): number[] | null {
+  let s = ip.toLowerCase().replace(/%.*$/, '');
+  const v4 = /(\d+\.\d+\.\d+\.\d+)$/.exec(s);
+  if (v4) {
+    const [a, b, c, d] = v4[1].split('.').map(Number);
+    s = s.slice(0, v4.index) + ((a << 8) | b).toString(16) + ':' + ((c << 8) | d).toString(16);
+  }
+  const [vorn, hinten] = s.split('::');
+  const links = vorn ? vorn.split(':') : [];
+  const rechts = hinten ? hinten.split(':') : [];
+  const fehlen = s.includes('::') ? 8 - links.length - rechts.length : 0;
+  if (fehlen < 0) return null;
+  const teile = [...links, ...Array(fehlen).fill('0'), ...rechts].map((h) => parseInt(h, 16));
+  return teile.length === 8 && teile.every((n) => n >= 0 && n <= 0xffff) ? teile : null;
 }
+
+const alsIpv4 = (hoch: number, tief: number) => `${hoch >> 8}.${hoch & 255}.${tief >> 8}.${tief & 255}`;
+
+// Bis 18.10.2026 kam „[::ffff:7f00:1]“ (= 127.0.0.1 in Hex-Schreibweise,
+// so schreibt Node jede gemappte Adresse um) durch. Jetzt wird jede
+// IPv4 geprüft, die in einer IPv6 steckt.
+export function ipIntern(ip: string): boolean {
+  if (isIP(ip) === 4) return ipv4Intern(ip);
+  const t = ipv6Teile(ip);
+  if (!t) return true;
+  const nullen = (bis: number) => t.slice(0, bis).every((n) => n === 0);
+  // ::ffff:a.b.c.d (gemappt), ::a.b.c.d (alt, auch :: und ::1), 64:ff9b::a.b.c.d (NAT64)
+  if ((nullen(5) && t[5] === 0xffff) || nullen(6) || (t[0] === 0x64 && t[1] === 0xff9b && t.slice(2, 6).every((n) => n === 0))) {
+    return ipv4Intern(alsIpv4(t[6], t[7]));
+  }
+  if (t[0] === 0x2002) return ipv4Intern(alsIpv4(t[1], t[2])); // 6to4
+  return (
+    (t[0] & 0xfe00) === 0xfc00 || // fc00::/7, privat
+    (t[0] & 0xffc0) === 0xfe80 || // fe80::/10, nur im eigenen Netz
+    (t[0] & 0xffc0) === 0xfec0 || // fec0::/10, alt
+    t[0] >> 8 === 0xff || // ff00::/8, Multicast
+    (t[0] === 0x64 && t[1] === 0xff9b) || // 64:ff9b:1::/48, NAT64 im eigenen Netz
+    (t[0] === 0x2001 && (t[1] === 0 || t[1] === 0xdb8)) || // Teredo, Dokumentation
+    (t[0] === 0x100 && nullen(4))
+  );
+}
+
+// Prüfen und Verbinden müssen dieselbe Adresse benutzen. Sonst kann ein Name
+// bei der Prüfung auf eine öffentliche IP zeigen und eine Sekunde später auf
+// 127.0.0.1 (DNS-Rebinding). Deshalb prüft die Verbindung selbst noch einmal.
+function sichererLookup(
+  host: string,
+  optionen: LookupOptions,
+  fertig: (fehler: Error | null, adresse: string | LookupAddress[], familie?: number) => void,
+) {
+  dnsLookup(host, { ...optionen, all: true, verbatim: true }, (fehler, adressen) => {
+    if (fehler) return fertig(fehler, '');
+    if (!adressen.length || adressen.some((a) => ipIntern(a.address))) return fertig(new Error('nicht_erlaubt'), '');
+    if (optionen.all) fertig(null, adressen);
+    else fertig(null, adressen[0].address, adressen[0].family);
+  });
+}
+
+const VERBINDUNG = new Agent({ connect: { lookup: sichererLookup } });
+export const abrufen = (url: URL, optionen: Omit<RequestInit, 'dispatcher'>) => fetch(url, { ...optionen, dispatcher: VERBINDUNG });
 
 async function pruefeAdresse(url: URL): Promise<void> {
   if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('nicht_erlaubt');
@@ -188,7 +244,7 @@ async function holen(start: URL, frist: number, nurText = true, zaehler?: { wied
     await pruefeAdresse(url);
     const rest = ende - Date.now();
     if (rest < 300) throw new Error('nicht_erreichbar');
-    const anfrage = () => fetch(url, {
+    const anfrage = () => abrufen(url, {
       redirect: 'manual',
       signal: AbortSignal.timeout(Math.max(300, ende - Date.now())),
       headers: {
@@ -199,7 +255,7 @@ async function holen(start: URL, frist: number, nurText = true, zaehler?: { wied
     });
     // Ein Abbruch der Verbindung wird einmal wiederholt (Testlauf 09.10.2026:
     // ein Server setzte jede zweite Verbindung zurück, egal mit welcher Kennung).
-    let antwort: Response;
+    let antwort: Awaited<ReturnType<typeof abrufen>>;
     try {
       antwort = await anfrage();
     } catch (fehler) {
@@ -248,7 +304,9 @@ async function holen(start: URL, frist: number, nurText = true, zaehler?: { wied
     } catch {
       text = new TextDecoder('utf-8').decode(bytes);
     }
-    const weiter = /html/i.test(typ) || /<html/i.test(text) ? metaWeiterleitung(text, url) : null;
+    const istHtml = /html/i.test(typ) || /<html/i.test(text);
+    if (istHtml) text = entschaerfen(text);
+    const weiter = istHtml ? metaWeiterleitung(text, url) : null;
     if (weiter && weiter.href !== url.href && sprung < 4) {
       url = weiter;
       continue;
@@ -283,6 +341,80 @@ function attribute(tag: string): Record<string, string> {
   return werte;
 }
 
+// Eine präparierte Seite (z. B. 3 MB „<a>“ ohne „</a>“) ließ die Suchmuster
+// unten minutenlang laufen (Sicherheitsprüfung 18.10.2026). Deshalb wird das
+// HTML vorher in einem Durchgang aufgeräumt: „<“ ohne eigenes „>“ wird zu
+// &lt;, überlange Tags fallen weg, ebenso öffnende Tags ohne späteres
+// Gegenstück, und ein offenes <script>, <style> oder <!-- schneidet den Rest
+// ab. Danach findet jedes Suchmuster sein Ende in einem Schritt.
+const PAARE = ['a', 'form', 'noscript', 'svg', 'template', 'head', 'title', 'legend', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+const ROHTEXT = ['script', 'style'];
+const HOECHSTENS_TAG = 4000;
+
+export function entschaerfen(html: string): string {
+  const klein = html.replace(/[A-Z]+/g, (s) => s.toLowerCase());
+  const letzterSchluss = new Map(PAARE.map((n) => [n, klein.lastIndexOf(`</${n}>`)]));
+  const teile: string[] = [];
+  let kopiertBis = 0;
+  let gt = -1;
+  let i = klein.indexOf('<');
+  while (i !== -1) {
+    if (klein.startsWith('<!--', i)) {
+      const ende = klein.indexOf('-->', i + 4);
+      if (ende === -1) break;
+      i = klein.indexOf('<', ende + 3);
+      continue;
+    }
+    if (gt < i) {
+      gt = klein.indexOf('>', i);
+      if (gt === -1) gt = Infinity;
+    }
+    const naechstes = klein.indexOf('<', i + 1);
+    if (gt === Infinity || (naechstes !== -1 && gt > naechstes)) {
+      teile.push(html.slice(kopiertBis, i), '&lt;');
+      kopiertBis = i + 1;
+    } else if (gt - i > HOECHSTENS_TAG) {
+      teile.push(html.slice(kopiertBis, i), ' ');
+      kopiertBis = gt + 1;
+    } else {
+      const name = /^<([a-z][a-z0-9]*)/.exec(klein.slice(i, i + 12))?.[1];
+      if (name && ROHTEXT.includes(name)) {
+        const ende = klein.indexOf(`</${name}`, gt + 1);
+        if (ende === -1) break;
+        i = ende;
+        continue;
+      }
+      if (name && PAARE.includes(name) && letzterSchluss.get(name)! < i) {
+        teile.push(html.slice(kopiertBis, i), ' ');
+        kopiertBis = gt + 1;
+      }
+    }
+    i = naechstes;
+  }
+  teile.push(html.slice(kopiertBis, i === -1 ? html.length : i));
+  return teile.join('');
+}
+
+// Auch der Text bekommt Grenzen: Die Muster für Zeiten, Preise und Nummern
+// laufen je Zeile, bei einer 3 MB langen Zeile aus Ziffern also ewig.
+const HOECHSTENS_WORT = 200;
+const HOECHSTENS_ZEILE = 1000;
+const HOECHSTENS_TEXT = 200_000;
+
+function zeileTeilen(zeile: string): string[] {
+  const z = zeile.replace(new RegExp(`\\S{${HOECHSTENS_WORT + 1},}`, 'g'), (w) => w.slice(0, HOECHSTENS_WORT));
+  const teile: string[] = [];
+  let rest = z;
+  while (rest.length > HOECHSTENS_ZEILE) {
+    const schnitt = rest.lastIndexOf(' ', HOECHSTENS_ZEILE);
+    const bei = schnitt > HOECHSTENS_ZEILE / 2 ? schnitt : HOECHSTENS_ZEILE;
+    teile.push(rest.slice(0, bei).trim());
+    rest = rest.slice(bei).trim();
+  }
+  if (rest) teile.push(rest);
+  return teile;
+}
+
 function ohneBallast(html: string): string {
   return html
     .replace(/<!--[\s\S]*?-->/g, ' ')
@@ -306,7 +438,9 @@ export function zuText(html: string): string {
     .split('\n')
     .map((z) => z.replace(/[ \t   ]+/g, ' ').replace(/^\s*\|\s*/, '').replace(/(\s*\|\s*)+$/, '').trim())
     .filter((z) => z && z !== '##' && z !== '•')
-    .join('\n');
+    .flatMap(zeileTeilen)
+    .join('\n')
+    .slice(0, HOECHSTENS_TEXT);
 }
 
 const woerterZaehlen = (text: string) => text.split(/\s+/).filter((w) => /\p{L}{2,}/u.test(w)).length;
@@ -691,7 +825,7 @@ async function linkStatus(start: URL): Promise<number> {
   for (let sprung = 0; sprung <= 4; sprung++) {
     try {
       await pruefeAdresse(url);
-      const antwort = await fetch(url, {
+      const antwort = await abrufen(url, {
         redirect: 'manual',
         signal: AbortSignal.timeout(Math.max(300, ende - Date.now())),
         headers: { 'user-agent': KENNUNG, accept: 'text/html,*/*;q=0.5' },
@@ -788,7 +922,7 @@ async function ohneWwwTot(start: URL): Promise<boolean> {
         const u = new URL(start.href);
         u.protocol = protokoll;
         await pruefeAdresse(u);
-        const antwort = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(6000), headers: { 'user-agent': KENNUNG } });
+        const antwort = await abrufen(u, { redirect: 'manual', signal: AbortSignal.timeout(6000), headers: { 'user-agent': KENNUNG } });
         await antwort.body?.cancel();
         return false;
       } catch {
@@ -942,4 +1076,4 @@ export async function sammeln(eingabe: string, optionen: { bis?: number } = {}):
 }
 
 /** Nur für muster.test.ts. */
-export const fuerTests = { VORLAGENREST, WOCHENTAG, UHRZEIT_SPANNE, PLZ_ORT, HAUSNUMMER_AM_ENDE, ZEIT_FREI, ZEIT_ZUSAMMENHANG, KEIN_PREIS, robotsSperrt, robotsGruppen, robotsErlaubt, robotsAuswerten, EIGENE_NAMEN, zuText };
+export const fuerTests = { VORLAGENREST, WOCHENTAG, UHRZEIT_SPANNE, PLZ_ORT, HAUSNUMMER_AM_ENDE, ZEIT_FREI, ZEIT_ZUSAMMENHANG, KEIN_PREIS, robotsSperrt, robotsGruppen, robotsErlaubt, robotsAuswerten, EIGENE_NAMEN, zuText, seiteAuswerten, leereSignale, abrufen, ipIntern };

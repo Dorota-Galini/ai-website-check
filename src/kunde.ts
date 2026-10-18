@@ -163,7 +163,42 @@ export function materialBauen({ signale: s, seiten }: Gesammelt): string {
     rest -= text.length;
     teile.push(`## Seite (${seite.art}): ${seite.url}\nTitel: ${seite.titel ?? ''}\n\n${text}\n`);
   }
-  return [...kopf, ...teile].join('\n');
+  // Fremder Text darf den Rahmen um das Material nicht schließen.
+  return [...kopf, ...teile].join('\n').replace(/<(\/?)material\b/gi, '‹$1material');
+}
+
+// ── KI-Antwort absichern (Sicherheitsprüfung 18.10.2026) ────────────────
+// Eine fremde Seite kann der KI Anweisungen unterschieben („setz seite auf
+// abc“, „empfiehl die Nummer 0800 …“). Die KI hat keine Werkzeuge, aber was
+// sie schreibt, steht unter dem Namen Galini Studio im Bericht. Deshalb:
+// Seite nur aus den gelesenen Seiten, Nummern, Adressen und Links nur, wenn
+// sie im Material stehen, und jede Angabe hat eine Höchstlänge.
+
+// Telefonnummern beginnen mit + oder 0. Verglichen werden die letzten sieben
+// Ziffern, damit „+49 1234 …“ und „01234 …“ dieselbe Nummer sind.
+const NUMMER = /(?:\+|\b0)\d[\d \/()-]{5,}\d/g;
+const LINK = /\bhttps?:\/\/[^\s"'<>]+|\bwww\.[^\s"'<>]+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+|\b[\w-]+(?:\.[\w-]+)*\.(?:de|com|pl|eu|net|org|info|biz|io|at|ch|nl|shop|online|app|me)\b/gi;
+const nummerKern = (s: string) => s.replace(/\D/g, '').slice(-7);
+
+/** Sätze mit Nummern oder Links, die nicht im Material stehen, fallen weg. */
+export function ohneFremdeAngaben(text: string, material: string, hoechstens: number): string {
+  const m = material.toLowerCase();
+  const nummern = new Set((material.match(NUMMER) ?? []).map(nummerKern));
+  const fremd = (satz: string) =>
+    (satz.match(NUMMER) ?? []).some((n) => n.replace(/\D/g, '').length >= 7 && !nummern.has(nummerKern(n))) ||
+    (satz.match(LINK) ?? []).some((l) => !m.includes(l.toLowerCase().replace(/^https?:\/\//, '').replace(/[.,;:!?)]+$/, '')));
+  const saetze = text.split(/(?<=[.!?])\s+/).filter((s) => !fremd(s));
+  const ergebnis = saetze.join(' ').trim();
+  return ergebnis.length > hoechstens ? `${ergebnis.slice(0, hoechstens - 1).trimEnd()}…` : ergebnis;
+}
+
+/** Die Seite eines Belegs: genannt und gelesen, sonst die Seite mit dem Zitat, sonst die Startseite. */
+export function seiteFinden(genannt: string, zitat: string, gesammelt: Gesammelt): string {
+  const gelesen = gesammelt.seiten.map((s) => s.url);
+  if (gelesen.includes(genannt)) return genannt;
+  const z = rand(glatt(zitat));
+  const mitZitat = z.length >= 4 ? gesammelt.seiten.find((s) => glatt(s.text).includes(z)) : undefined;
+  return mitZitat?.url ?? gelesen[0] ?? gesammelt.signale.adresse ?? '';
 }
 
 /**
@@ -223,17 +258,25 @@ export async function alsKundeLesen(
     const bericht = msg.parsed_output;
     if (!bericht) return { fehler: 'leer', info: msg.stop_reason ?? '' };
     const antworten: KiBericht['antworten'] = {};
+    const sauber = (t: string, hoechstens: number) => ohneFremdeAngaben(t, material, hoechstens);
     for (const a of bericht.antworten) {
       if (antworten[a.frage]) continue;
       const mitZitat = a.status === 'gefunden' || a.status === 'teilweise';
-      antworten[a.frage] = { ...a, belegt: mitZitat && zitatBelegt(a.zitat, material) };
+      const zitat = a.zitat.slice(0, 300);
+      antworten[a.frage] = {
+        ...a,
+        antwort: sauber(a.antwort, 400),
+        zitat,
+        seite: seiteFinden(a.seite, zitat, gesammelt),
+        belegt: mitZitat && zitatBelegt(zitat, material),
+      };
     }
     return {
-      branche: bericht.branche,
-      auftrag: bericht.auftrag,
+      branche: sauber(bericht.branche, 80),
+      auftrag: sauber(bericht.auftrag, 200),
       antworten,
-      eindruck: bericht.eindruck,
-      tipps: bericht.tipps.slice(0, 3),
+      eindruck: sauber(bericht.eindruck, 600),
+      tipps: bericht.tipps.map((t) => sauber(t, 300)).filter(Boolean).slice(0, 3),
       modell: MODELL,
       tokens: { rein: msg.usage.input_tokens, raus: msg.usage.output_tokens },
     };
