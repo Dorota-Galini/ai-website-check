@@ -14,6 +14,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import * as z from 'zod/v4';
 import type { Gesammelt } from './sammeln.ts';
+import { aufSeiteBelegt, ortPruefen, suchbegriffPruefen } from './frage.ts';
 
 // Dasselbe Modell wie online auf galini-studio.de. Mit KI_CHECK_MODELL änderbar.
 const MODELL = process.env.KI_CHECK_MODELL ?? 'claude-sonnet-5-5';
@@ -48,19 +49,43 @@ const Antwort = z.object({
   seite: z.string().describe('Adresse der Seite, aus der das Zitat stammt; sonst leer'),
 });
 
+// Seit 24.10.2026: eine zehnte Frage, die zur Branche gehört (Notdienst beim
+// Installateur, Reservierung beim Restaurant, Kassen bei der Praxis). Gleiche
+// Zitatpflicht wie die sieben festen Fragen.
+const Branchenfrage = z.object({
+  frage: z.string().describe('Eine Frage, die Kunden gerade in dieser Branche stellen und die in den sieben Fragen noch nicht steckt, als Kundenfrage an den Betrieb wie die sieben („Habt ihr …?“), höchstens 90 Zeichen; leer, wenn dir keine passende einfällt'),
+  status: z.enum(['gefunden', 'teilweise', 'nicht_gefunden']),
+  antwort: z.string().describe('Was du als Kunde jetzt weißt, ein bis zwei kurze Sätze in Ich-Form'),
+  zitat: z.string().describe('Wörtliche Stelle aus dem Material, höchstens 200 Zeichen; leer bei nicht_gefunden'),
+  seite: z.string().describe('Adresse der Seite, aus der das Zitat stammt; sonst leer'),
+});
+
 const Bericht = z.object({
   branche: z.string(),
+  // Seit 22.10.2026 für „Nennt die KI deinen Betrieb?“ (sichtbar.ts): Aus
+  // Suchbegriff und Ort baut der Server die Kundenfrage, am Namen erkennt er,
+  // ob der Betrieb in der Antwort vorkommt.
+  name: z.string().describe('Name des Betriebs, so wie er auf der Website steht; leer, wenn unklar'),
+  suchbegriff: z.string().describe('Wonach ein Kunde sucht, um so einen Betrieb zu finden, zwei bis vier Wörter in der Sprache der Website, ohne Ort und ohne Namen, zum Beispiel „Dachdecker“ oder „Website erstellen lassen“'),
+  ort: z.string().describe('Ort, in dem der Betrieb Kunden bedient, zum Beispiel „Lohne (Oldenburg)“; leer, wenn es keine Kunden vor Ort gibt oder es nicht im Material steht'),
   auftrag: z.string().describe('Der typische Kundenauftrag, den du spielst, als kurzer Satz'),
   antworten: z.array(Antwort),
+  branchenfrage: Branchenfrage,
   eindruck: z.string().describe('Zwei bis drei Sätze, wie es sich als Kunde angefühlt hat'),
   tipps: z.array(z.string()).describe('Höchstens drei konkrete Verbesserungen, an den Inhaber, in Du-Form'),
 });
 
 export type KiAntwort = z.infer<typeof Antwort> & { belegt: boolean };
+export type KiBranchenfrage = z.infer<typeof Branchenfrage> & { belegt: boolean };
 export interface KiBericht {
   branche: string;
+  name: string;
+  suchbegriff: string;
+  ort: string;
   auftrag: string;
   antworten: Partial<Record<Frage, KiAntwort>>;
+  /** Seit 24.10.2026. Fehlt, wenn der KI keine passende Frage einfiel. */
+  branchenfrage?: KiBranchenfrage;
   eindruck: string;
   tipps: string[];
   modell: string;
@@ -76,12 +101,13 @@ function anweisung(sprache: 'de' | 'pl' | 'en'): string {
   return `Du bist Herr Entwurf, die Papierfigur von Galini Studio. Hier spielst du einen ganz normalen Kunden aus der Gegend, der auf der Website eines Betriebs etwas erledigen will. Du hast nur das Material unten: den Text der Website, so wie ihn ein KI-Assistent ohne JavaScript liest, und ein paar Angaben aus dem Quelltext. Du klickst nichts an und schickst nichts ab.
 
 So gehst du vor:
-1. Erkenne die Branche und nimm dir einen typischen Kundenauftrag vor, zum Beispiel „Dachrinne reparieren lassen“ oder „Tisch für Samstag reservieren“.
+1. Erkenne die Branche und nimm dir einen typischen Kundenauftrag vor, zum Beispiel „Dachrinne reparieren lassen“ oder „Tisch für Samstag reservieren“. Notiere außerdem name, suchbegriff und ort (siehe Felder). suchbegriff und ort stehen immer in der Sprache der Website, auch wenn du sonst Polnisch oder Englisch schreibst.
 2. Beantworte als dieser Kunde genau diese Fragen, jede einmal:
 ${FRAGEN_SCHLUESSEL.map((k) => `   - ${k}: ${FRAGEN_FUER_KI[k]}`).join('\n')}
 3. Zu jeder Frage: status ist gefunden, teilweise, nicht_gefunden oder passt_nicht. antwort sagt in ein bis zwei kurzen Sätzen in Ich-Form, was du als Kunde jetzt weißt. zitat ist eine Stelle, die du WÖRTLICH aus dem Material kopierst (höchstens 200 Zeichen) und die deine Antwort belegt. seite ist die Adresse, unter der das Zitat steht. Bei nicht_gefunden und passt_nicht bleiben zitat und seite leer.
-4. eindruck: zwei bis drei Sätze, wie es sich als Kunde angefühlt hat.
-5. tipps: höchstens drei konkrete Verbesserungen, die Kunden am meisten helfen würden, an den Inhaber in Du-Form. Nur Dinge, die im Material fehlen oder schwer zu finden sind.
+4. branchenfrage: Stell als dieser Kunde noch eine Frage, die in genau dieser Branche oft kommt und in den sieben Fragen noch nicht steckt, zum Beispiel „Habt ihr einen Notdienst am Wochenende?“ beim Installateur, „Kann ich online einen Tisch reservieren?“ beim Restaurant oder „Nehmt ihr auch gesetzlich Versicherte?“ bei einer Praxis. Die frage schreibst du in der Ausgabesprache. Für status, antwort, zitat und seite gelten dieselben Regeln wie oben. Fällt dir keine sinnvolle Frage ein, lass frage leer.
+5. eindruck: zwei bis drei Sätze, wie es sich als Kunde angefühlt hat.
+6. tipps: höchstens drei konkrete Verbesserungen, die Kunden am meisten helfen würden, an den Inhaber in Du-Form. Nur Dinge, die im Material fehlen oder schwer zu finden sind.
 
 Sprache: ${ausgabe}
 
@@ -90,7 +116,7 @@ Regeln:
 - teilweise heißt: Es gibt einen Hinweis, aber du weißt es nicht sicher. Beispiele: „Preise auf Anfrage“, „Termine nach Vereinbarung“, eine Nummer ohne Zeiten, ein Einzugsgebiet ohne Anschrift.
 - passt_nicht nur, wenn eine Frage für diese Art Anbieter keinen Sinn ergibt: zum Beispiel Öffnungszeiten, Anfahrt oder „kommt ihr zu mir“ bei einer reinen Software zum Herunterladen oder einem reinen Online-Shop. Bei Handwerk, Praxis, Gastronomie, Handel vor Ort und Dienstleistern passt jede Frage. Sag in antwort kurz, warum sie nicht passt.
 - Preise: Auch „ab“-Preise, Richtwerte und Beispielrechnungen zählen als gefunden. Förderbeträge, Stammkapital und Rabattaktionen sind keine Preise. Werbesätze wie „faire Preise“ oder „günstig“ sagen nichts über den Preis, das ist nicht_gefunden. teilweise nur, wenn erklärt wird, wie man an einen Preis kommt (Preisanfrage, Kostenvoranschlag, Einschätzung nach Besichtigung).
-- vertrauen: gefunden, wenn es echte Belege gibt: Fotos eigener Arbeiten, Kundenstimmen oder Bewertungen, Meisterbetrieb, Mitgliedschaft in der Innung, seit wann es den Betrieb gibt, Namen der Leute. Werbesätze wie „Qualität ist unser Anspruch“ zählen nicht. Bilder siehst du nicht, nur Hinweise im Text wie „Referenzen“ oder „Galerie“, das ist höchstens teilweise.
+- vertrauen: gefunden, wenn es echte Belege gibt: Fotos eigener Arbeiten, Kundenstimmen oder Bewertungen, Meisterbetrieb, Mitgliedschaft in der Innung, seit wann es den Betrieb gibt, Namen der Leute. Werbesätze wie „Qualität ist unser Anspruch“ zählen nicht. Bilder siehst du nicht, nur Hinweise im Text wie „Referenzen“ oder „Galerie“, das ist höchstens teilweise. Ein Link zu einem Bewertungsportal (Angaben aus dem Quelltext) zählt als Bewertung. Bilder von Bildagenturen sind keine eigenen Arbeiten.
 - zeiten: Ein klares Versprechen, bis wann man sich meldet (zum Beispiel „Antwort innerhalb von 24 Stunden“), beantwortet die Frage, das ist gefunden. Nur „meistens morgens“ ohne Zusage ist teilweise.
 - Die Angaben aus dem Quelltext sind sicher. Widersprich ihnen nicht. Steht dort, dass eine Seite nicht gelesen werden konnte, schreib bei den Fragen, die sie betrifft, dass du das nicht prüfen konntest.
 - In den Tipps keine erfundenen Zahlen, Preise oder Zeiten, auch nicht als Beispiel.
@@ -105,7 +131,7 @@ Regeln:
 // Zeilen, die eine der Fragen beantworten könnten. Sie kommen vor den
 // Seitentext, weil der gekürzt wird (Testlauf 09.10.2026: Auf galini-studio.de
 // stand die Rückrufzeit bei Zeichen 10.107 und fehlte der KI).
-const WICHTIG = /€|\beur\b|euro|\buhr\b|öffnungszeit|geschäftszeit|bürozeit|sprechzeit|erreichbar|telefon|\btel\b|mobil|whatsapp|termin|anfrage|preis|kosten|\b\d{5}\s+[A-ZÄÖÜ]|straße|strasse|str\.|anruf|rufe|rückruf|umkreis|kilometer|\bkm\b|einzugsgebiet|landkreis|notdienst|vereinbarung|referenz|kundenstimme|bewertung|meisterbetrieb|innung|gegründet|seit (?:19|20)\d{2}|jahre erfahrung|zertifi|galerie|godzin|cena|cennik|zł\b|telefon|kontakt/i;
+const WICHTIG = /€|\beur\b|euro|\buhr\b|öffnungszeit|geschäftszeit|bürozeit|sprechzeit|erreichbar|telefon|\btel\b|mobil|whatsapp|termin|anfrage|preis|kosten|\b\d{5}\s+[A-ZÄÖÜ]|\b\d{2}-\d{3}\s+[A-ZŁŚŻ]|\bul\.\s|zadzwoń|straße|strasse|str\.|anruf|rufe|rückruf|umkreis|kilometer|\bkm\b|einzugsgebiet|landkreis|notdienst|vereinbarung|referenz|kundenstimme|bewertung|meisterbetrieb|innung|gegründet|seit (?:19|20)\d{2}|jahre erfahrung|zertifi|galerie|godzin|cena|cennik|zł\b|telefon|kontakt/i;
 
 function wichtigeZeilen(seiten: Gesammelt['seiten']): string[] {
   const zeilen: string[] = [];
@@ -150,6 +176,12 @@ export function materialBauen({ signale: s, seiten }: Gesammelt): string {
     `- Nicht gelesen (Seite kam nicht): ${s.nichtGelesen.length ? s.nichtGelesen.map((x) => `${x.art} ${x.url}${x.grund === 'robots' ? ' (von der robots.txt gesperrt)' : ''}`).join(' / ') : 'keine'}`,
     `- So steht die Startseite in Google: Titel „${s.google.titel ?? ''}“, Beschreibung „${s.google.beschreibung ?? 'keine'}“`,
     `- Platzhalter aus Vorlagen: ${s.vorlagenreste.length ? s.vorlagenreste.map((b) => b.text).join(' / ') : 'keine gefunden'}`,
+    // Seit 24.10.2026: was die Regeln zu „Vertrauen“ im Quelltext sehen.
+    `- Links oder Widgets zu Bewertungsportalen: ${s.bewertungen.length ? s.bewertungen.map((b) => b.text).join(' / ') : 'keine'}`,
+    `- Bewertungen mit Sternen in den Angaben für Suchmaschinen: ${ja(s.sterne ? 1 : 0)}`,
+    `- Baukasten: ${s.baukasten ? `${s.baukasten} (Formulare erscheinen dort oft erst per JavaScript und fehlen dann im Material)` : 'keiner erkannt'}`,
+    `- Formular, das per Skript geladen wird: ${s.jsFormulare.length ? s.jsFormulare.map((b) => b.text).join(' / ') : 'keins'}`,
+    `- Bilder von Bildagenturen (keine eigenen Fotos): ${s.bilder.stockZahl ? `${s.bilder.stockZahl}, z. B. ${s.bilder.stock[0]?.text ?? ''}` : 'keine erkannt'}`,
     '',
   ];
   const wichtig = wichtigeZeilen(seiten);
@@ -176,12 +208,16 @@ export function materialBauen({ signale: s, seiten }: Gesammelt): string {
 
 // Telefonnummern beginnen mit + oder 0. Verglichen werden die letzten sieben
 // Ziffern, damit „+49 1234 …“ und „01234 …“ dieselbe Nummer sind.
-const NUMMER = /(?:\+|\b0)\d[\d \/()-]{5,}\d/g;
+// Seit 24.10.2026 auch polnische Nummern ohne 0 („600 100 200“) und Nummern
+// mit Punkten („0800.1234.567“, Sicherheitsprüfung 24.10.2026, Fund 3).
+const NUMMER = /(?:\+|\b0)\d[\d \/().-]{5,}\d|\b\d{3}[ .-]\d{3}[ .-]\d{3}\b/g;
 const LINK = /\bhttps?:\/\/[^\s"'<>]+|\bwww\.[^\s"'<>]+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+|\b[\w-]+(?:\.[\w-]+)*\.(?:de|com|pl|eu|net|org|info|biz|io|at|ch|nl|shop|online|app|me)\b/gi;
 const nummerKern = (s: string) => s.replace(/\D/g, '').slice(-7);
 
 /** Sätze mit Nummern oder Links, die nicht im Material stehen, fallen weg. */
-export function ohneFremdeAngaben(text: string, material: string, hoechstens: number): string {
+export function ohneFremdeAngaben(roh: string, material: string, hoechstens: number): string {
+  // Erst kürzen, dann filtern: Die Muster laufen sonst über bis zu 16.000 Tokens (Sicherheitsprüfung 24.10.2026, H2).
+  const text = roh.slice(0, hoechstens * 4);
   const m = material.toLowerCase();
   const nummern = new Set((material.match(NUMMER) ?? []).map(nummerKern));
   const fremd = (satz: string) =>
@@ -271,10 +307,30 @@ export async function alsKundeLesen(
         belegt: mitZitat && zitatBelegt(zitat, material),
       };
     }
+    // Suchbegriff und Ort nur, wenn sie als kurze Wörter durchgehen und auf
+    // der Seite stehen (Sicherheitsprüfung 22.10.2026, Fund 2). Sonst bleiben
+    // sie leer, und es gibt keinen Knopf „Nennt eine KI deinen Betrieb?“.
+    const sicht = { suchbegriff: suchbegriffPruefen(bericht.suchbegriff) ?? '', ort: ortPruefen(bericht.ort) ?? '' };
+    const sichtOk = !!sicht.suchbegriff && !!sicht.ort && aufSeiteBelegt(sicht, material);
+    const bf = bericht.branchenfrage;
+    const bfFrage = bf ? sauber(bf.frage, 120) : '';
+    const bfZitat = bf ? bf.zitat.slice(0, 300) : '';
+    const branchenfrage: KiBranchenfrage | undefined = bf && bfFrage.length >= 8 ? {
+      ...bf,
+      frage: bfFrage,
+      antwort: sauber(bf.antwort, 400),
+      zitat: bfZitat,
+      seite: seiteFinden(bf.seite, bfZitat, gesammelt),
+      belegt: bf.status !== 'nicht_gefunden' && zitatBelegt(bfZitat, material),
+    } : undefined;
     return {
       branche: sauber(bericht.branche, 80),
+      name: sauber(bericht.name, 80),
+      suchbegriff: sichtOk ? sicht.suchbegriff : '',
+      ort: sichtOk ? sicht.ort : '',
       auftrag: sauber(bericht.auftrag, 200),
       antworten,
+      ...(branchenfrage ? { branchenfrage } : {}),
       eindruck: sauber(bericht.eindruck, 600),
       tipps: bericht.tipps.map((t) => sauber(t, 300)).filter(Boolean).slice(0, 3),
       modell: MODELL,
