@@ -17,9 +17,10 @@ import type { Gesammelt } from './sammeln.ts';
 import { aufSeiteBelegt, ortPruefen, suchbegriffPruefen } from './frage.ts';
 
 // Dasselbe Modell wie online auf galini-studio.de. Mit KI_CHECK_MODELL änderbar.
-const MODELL = process.env.KI_CHECK_MODELL ?? 'claude-sonnet-5-5';
+// Gelesen wird erst beim Aufruf, damit ein Programm, das diese Datei
+// einbindet, die Variable noch setzen kann.
+const modell = () => process.env.KI_CHECK_MODELL ?? 'claude-sonnet-5-5';
 
-export { MODELL };
 // Der Chat läuft auf „low“. Hier muss er mehrere Seiten lesen und zitieren;
 // beide Testrunden liefen auf „medium“.
 const AUFWAND = 'medium' as const;
@@ -287,7 +288,7 @@ export async function alsKundeLesen(
   const client = new Anthropic({ maxRetries: 0, timeout: frist });
   try {
     const msg = await client.messages.parse({
-      model: MODELL,
+      model: modell(),
       max_tokens: 16000,
       output_config: { effort: AUFWAND, format: zodOutputFormat(Bericht) },
       system: anweisung(sprache),
@@ -336,7 +337,7 @@ export async function alsKundeLesen(
       ...(branchenfrage ? { branchenfrage } : {}),
       eindruck: sauber(bericht.eindruck, 600),
       tipps: bericht.tipps.map((t) => sauber(t, 300)).filter(Boolean).slice(0, 3),
-      modell: MODELL,
+      modell: modell(),
       tokens: { rein: msg.usage.input_tokens, raus: msg.usage.output_tokens },
     };
   } catch (fehler) {
