@@ -40,9 +40,11 @@ export interface KiCheckBericht {
   nichtGelesen: string[];
 }
 
+/** Ohne „?…“ und „#…“: Ein Bericht lässt sich als Link teilen, ein Token in einer Adresse soll nicht mitgehen. */
+const ohneAbfrage = (adresse: string) => adresse.replace(/[?#].*$/, '');
+
 export function berichtBauen(e: Ergebnis, s: Signale, ki: KiBericht | null, kiStatus: KiStatus, sprache: Sprache): KiCheckBericht {
-  // Ohne „?…“: Ein Bericht lässt sich als Link teilen, ein Token in der Adresse soll nicht mitgehen.
-  const adresse = (s.adresse ?? s.eingabe).replace(/[?#].*$/, '');
+  const adresse = ohneAbfrage(s.adresse ?? s.eingabe);
   return {
     sprache,
     zeit: new Date().toISOString(),
@@ -55,12 +57,12 @@ export function berichtBauen(e: Ergebnis, s: Signale, ki: KiBericht | null, kiSt
       ampel: p.ampel,
       satz: p.satz,
       ...(p.passtNicht ? { passtNicht: true } : {}),
-      ...(p.belege[0] ? { beleg: { text: p.belege[0].text, seite: p.belege[0].seite, ...(p.belegIstNotiz ? { notiz: true } : {}) } } : {}),
+      ...(p.belege[0] ? { beleg: { text: p.belege[0].text, seite: ohneAbfrage(p.belege[0].seite), ...(p.belegIstNotiz ? { notiz: true } : {}) } } : {}),
     })),
-    ...(e.branchenfrage ? { branchenfrage: e.branchenfrage } : {}),
+    ...(e.branchenfrage ? { branchenfrage: { ...e.branchenfrage, ...(e.branchenfrage.beleg ? { beleg: { ...e.branchenfrage.beleg, seite: ohneAbfrage(e.branchenfrage.beleg.seite) } } : {}) } } : {}),
     gefunden: e.gefunden,
     zaehlbar: e.zaehlbar,
-    eindruck: e.eindruck,
+    eindruck: e.eindruck.map((x) => (x.beleg ? { ...x, beleg: { ...x.beleg, seite: ohneAbfrage(x.beleg.seite) } } : x)),
     lesbarkeit: e.lesbarkeit,
     ki: ki ? { branche: ki.branche, auftrag: ki.auftrag, eindruck: ki.eindruck, tipps: ki.tipps } : null,
     ...(ki?.suchbegriff && ki.ort ? { sicht: { name: ki.name, suchbegriff: ki.suchbegriff, ort: ki.ort } } : {}),

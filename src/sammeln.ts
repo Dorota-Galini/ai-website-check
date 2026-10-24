@@ -516,8 +516,18 @@ interface Verweis {
   href: string;
 }
 
-function verweise(html: string, basis: URL): Verweis[] {
+/** decodeURIComponent wirft bei kaputter Prozent-Kodierung („tel:%“); dann eben der Rohtext (Nachprüfung 24.10.2026). */
+function dekodiert(t: string): string {
+  try {
+    return decodeURIComponent(t);
+  } catch {
+    return t;
+  }
+}
+
+function verweise(roh: string, basis: URL): Verweis[] {
   const liste: Verweis[] = [];
+  const html = entschaerfen(roh);
   for (const m of ohneBallast(html).matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
     const a = attribute(m[1]);
     const href = (a.href ?? '').trim();
@@ -585,7 +595,7 @@ function unterseitenWaehlen(alle: Verweis[], basis: URL, schon: Set<string>, ohn
       ziel.hash = '';
       const schluessel = ziel.href.replace(/\/+$/, '');
       if (schon.has(schluessel) || NICHT_FOLGEN.test(ziel.pathname)) continue;
-      if (!muster.test(decodeURIComponent(ziel.pathname)) && !muster.test(v.text)) continue;
+      if (!muster.test(dekodiert(ziel.pathname)) && !muster.test(v.text)) continue;
       schon.add(schluessel);
       gewaehlt.push({ url: ziel, art });
       break;
@@ -880,7 +890,10 @@ function strukturiertLesen(html: string, s: Signale) {
 }
 
 function seiteAuswerten(geholt: Geholt, art: Art, s: Signale): Seite {
-  const html = geholt.text;
+  // Immer entschärfen, auch wenn holen() es schon getan hat: Rahmen kamen bis
+  // zur Nachprüfung vom 24.10.2026 (N1) als text/plain ungefiltert hier an.
+  // Ein zweiter Durchgang ist linear und ändert entschärften Text nicht.
+  const html = entschaerfen(geholt.text);
   const url = geholt.url.href;
   const text = zuText(html);
   const titel = zeichenLoesen(html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '').replace(/\s+/g, ' ').trim() || undefined;
@@ -891,7 +904,7 @@ function seiteAuswerten(geholt: Geholt, art: Art, s: Signale): Seite {
   for (const v of verweise(html, geholt.url)) {
     const h = v.href;
     if (/^tel:/i.test(h)) {
-      const gewaehlt = decodeURIComponent(h.slice(4));
+      const gewaehlt = dekodiert(h.slice(4));
       beleg(s.telefonKlickbar, url, gewaehlt + (v.text ? ` („${v.text}“)` : ''));
       merken(s.nummernKerne, nummerKern(gewaehlt));
       // Zeigt der Link eine Nummer, muss es die sein, die er wählt (24.10.2026).
@@ -901,10 +914,10 @@ function seiteAuswerten(geholt: Geholt, art: Art, s: Signale): Seite {
       }
     }
     else if (/wa\.me\/|api\.whatsapp\.com|whatsapp:\/\/|chat\.whatsapp\.com/i.test(h)) beleg(s.whatsapp, url, v.text || h);
-    else if (/^mailto:/i.test(h)) beleg(s.emailKlickbar, url, decodeURIComponent(h.slice(7).split('?')[0]));
+    else if (/^mailto:/i.test(h)) beleg(s.emailKlickbar, url, dekodiert(h.slice(7).split('?')[0]));
     if (BUCHUNGSDIENSTE.test(h)) beleg(s.buchung, url, `${v.text ? `„${v.text}“, ` : ''}${v.url.hostname}${v.url.pathname}`.slice(0, 140));
     if (/\.pdf$/i.test(v.url.pathname) && /preis|tarif|kosten|karte|liste|cennik/i.test(v.text + ' ' + v.url.pathname)) {
-      beleg(s.preisDateien, url, `${v.text ? `„${v.text}“, ` : ''}${decodeURIComponent(v.url.pathname.split('/').pop() ?? '')}`);
+      beleg(s.preisDateien, url, `${v.text ? `„${v.text}“, ` : ''}${dekodiert(v.url.pathname.split('/').pop() ?? '')}`);
     }
     // Nur der Anfang der Adresse: Mit „.*“ lief das Muster auf 4000 Zeichen
     // langen Links spürbar (Sicherheitsprüfung 24.10.2026, Fund 2).
@@ -1418,7 +1431,8 @@ export async function sammeln(eingabe: string, optionen: { bis?: number } = {}):
   s.frames = /<frameset\b/i.test(startSeite.text);
   const geholteRahmen = await Promise.allSettled(rahmen.map((u) => holen(u, frist(ZEIT_SEITE_MS), true, zaehler)));
   for (const r of geholteRahmen) {
-    if (r.status !== 'fulfilled') continue;
+    // Wie bei den Unterseiten: nur HTML (Nachprüfung 24.10.2026, N1).
+    if (r.status !== 'fulfilled' || !(/html/i.test(r.value.typ) || /<html/i.test(r.value.text))) continue;
     schon.add(r.value.url.href.replace(/\/+$/, ''));
     seiten.push(seiteAuswerten(r.value, 'rahmen', s));
     alleVerweise = alleVerweise.concat(verweise(r.value.text, r.value.url));

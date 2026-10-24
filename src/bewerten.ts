@@ -729,7 +729,8 @@ function widersprueche(s: Signale, t: Texte): EindruckPunkt[] {
 function ersterEindruck(s: Signale, sprache: Sprache, ortPruefen = false): EindruckPunkt[] {
   const t: Texte = T[sprache];
   const liste: EindruckPunkt[] = [];
-  const domain = (s.adresse ?? s.eingabe).replace(/^https?:\/\//, '').replace(/\/$/, '');
+  // Ohne „?…“: Der Bericht lässt sich teilen (Nachprüfung 24.10.2026, N2).
+  const domain = (s.adresse ?? s.eingabe).replace(/[?#].*$/, '').replace(/^https?:\/\//, '').replace(/\/$/, '');
 
   // Google. Rot nur, wenn der ganze Titel leer ist („Homepage“). Steht das
   // leere Wort nur vorn („Homepage - Muster Elektrotechnik“), ist es gelb.
@@ -794,7 +795,7 @@ function ersterEindruck(s: Signale, sprache: Sprache, ortPruefen = false): Eindr
   if (s.linksGeprueft > 0) {
     const n = s.kaputteLinks.length;
     liste.push(n
-      ? { thema: 'links', titel: t.linksTitel, kurz: t.linksKurz(s.linksGeprueft), ampel: 'rot', text: t.linksKaputt(n), belege: s.kaputteLinks.map((l) => t.linkBeleg(l.text, l.url.replace(/^https?:\/\/(www\.)?/, ''), l.status)) }
+      ? { thema: 'links', titel: t.linksTitel, kurz: t.linksKurz(s.linksGeprueft), ampel: 'rot', text: t.linksKaputt(n), belege: s.kaputteLinks.map((l) => t.linkBeleg(l.text, l.url.replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, ''), l.status)) }
       : { thema: 'links', titel: t.linksTitel, kurz: t.linksKurz(s.linksGeprueft), ampel: 'gruen', text: t.linksGut(s.linksGeprueft) });
   }
   return liste;

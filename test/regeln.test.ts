@@ -426,10 +426,39 @@ fall('ungültige Zeichen-Codes brechen nichts ab', () => {
   const s = lesen([{ html: seite('', '<p>A&#x110000;B&#99999999999;C&#65;</p>') }]);
   assert.ok(s.seiten.length === 1);
 });
-fall('keine Postfach-Abfrage für interne Namen', () => {
-  const s = lesen([{ html: seite('', '<a href="mailto:info@server.internal">Mail</a>') }]);
-  void fuerTests.postfachPruefen(s, new URL(START));
-  assert.equal(s.postfach, undefined);
+// Mit await: Ohne die Sperre fände resolveMx keine Domain, und s.postfach
+// wäre { mx: false } (Nachprüfung 24.10.2026, der Test prüfte vorher nichts).
+const intern = lesen([{ html: seite('', '<a href="mailto:info@server.internal">Mail</a>') }]);
+await fuerTests.postfachPruefen(intern, new URL(START));
+fall('keine Postfach-Abfrage für interne Namen', () => assert.equal(intern.postfach, undefined));
+
+// ── Nachprüfung 24.10.2026 ──────────────────────────────────────────────
+fall('N1: ungefilterter Text mit 3 MB <time> und <a> bremst nicht aus', () => {
+  for (const tag of ['time', 'a', 'title']) {
+    const roh = `<${tag}>x`.repeat(Math.floor(3_000_000 / (tag.length + 3)));
+    const start = Date.now();
+    seiteAuswerten({ url: new URL(START), text: roh, typ: 'text/plain' }, 'rahmen', leereSignale(START));
+    assert.ok(Date.now() - start < 3000, `<${tag}> brauchte ${Date.now() - start} ms`);
+  }
+});
+fall('kaputte Prozent-Kodierung in Links bricht nichts ab', () => {
+  const s = lesen([{ html: seite('', '<a href="tel:%">x</a><a href="mailto:a%E0@b.example">y</a><a href="/preis%E0.pdf">Preisliste</a>') }]);
+  assert.equal(s.seiten.length, 1);
+});
+fall('N2: kein Token irgendwo im Bericht', () => {
+  const s = lesen([{ html: seite('<meta name="viewport" content="width=device-width">', '<p>Ab 49 € je Inspektion.</p>'), pfad: '/?token=geheim' }]);
+  s.adresse = 'https://kfz-kolbenhof.example/?token=geheim';
+  s.kaputteLinks.push({ url: 'https://kfz-kolbenhof.example/alt?token=geheim', text: 'Alt', status: 404 });
+  s.linksGeprueft = 3;
+  const b = berichtBauen(bewerten(s, undefined, 'de'), s, null, 'pause', 'de');
+  assert.ok(!JSON.stringify(b).includes('geheim'), JSON.stringify(b).match(/.{40}geheim.{10}/)?.[0]);
+});
+fall('N3: Nummern in jeder Schreibweise fliegen raus', () => {
+  const material = 'Tel. 0000 111 222';
+  for (const z of ['0800\u20131234\u2013567', '0800\u00a01234\u00a0567', '0800_1234_567', '\uff10\uff18\uff10\uff10 1234567']) {
+    assert.equal(ohneFremdeAngaben(`Ruf ${z} an.`, material, 400), '', z);
+  }
+  assert.equal(ohneFremdeAngaben('Ruf 0000\u2013111\u2013222 an.', material, 400), 'Ruf 0000\u2013111\u2013222 an.');
 });
 
 console.log(`\n${n} Fälle bestanden`);

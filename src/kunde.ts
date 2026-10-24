@@ -219,9 +219,12 @@ export function ohneFremdeAngaben(roh: string, material: string, hoechstens: num
   // Erst kürzen, dann filtern: Die Muster laufen sonst über bis zu 16.000 Tokens (Sicherheitsprüfung 24.10.2026, H2).
   const text = roh.slice(0, hoechstens * 4);
   const m = material.toLowerCase();
-  const nummern = new Set((material.match(NUMMER) ?? []).map(nummerKern));
+  // Vollbreit-Ziffern, geschützte Leerzeichen, Halbgeviertstriche und „_“
+  // vorher vereinheitlichen, sonst schlüpft „0800–1234–567“ durch (Nachprüfung 24.10.2026, N3).
+  const glatt = (t: string) => t.normalize('NFKC').replace(/[\p{Zs}\p{Pd}_]/gu, ' ');
+  const nummern = new Set((glatt(material).match(NUMMER) ?? []).map(nummerKern));
   const fremd = (satz: string) =>
-    (satz.match(NUMMER) ?? []).some((n) => n.replace(/\D/g, '').length >= 7 && !nummern.has(nummerKern(n))) ||
+    (glatt(satz).match(NUMMER) ?? []).some((n) => n.replace(/\D/g, '').length >= 7 && !nummern.has(nummerKern(n))) ||
     (satz.match(LINK) ?? []).some((l) => !m.includes(l.toLowerCase().replace(/^https?:\/\//, '').replace(/[.,;:!?)]+$/, '')));
   const saetze = text.split(/(?<=[.!?])\s+/).filter((s) => !fremd(s));
   const ergebnis = saetze.join(' ').trim();
