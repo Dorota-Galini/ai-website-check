@@ -48,3 +48,45 @@ test('Bericht über KI-Leser', () => {
   assert.ok(robotsSperrt('User-agent: GPTBot\nDisallow: /\n\nUser-agent: *\nDisallow: /wp-admin/', 'GPTBot'));
   assert.ok(!robotsSperrt('User-agent: *\nDisallow: /\n\nUser-agent: Claude-SearchBot\nAllow: /', 'Claude-SearchBot'));
 });
+
+// Seit 25.10.2026 (Sicherheitsprüfung, Funde 2, 3, 6, 7): präparierte robots.txt
+// darf den Check nicht aufhalten. Die Zeitgrenzen sind großzügig, vorher
+// dauerten diese Fälle Sekunden bis Minuten.
+test('Platzhalter: gleiche Ergebnisse wie vorher', () => {
+  assert.equal(darf('User-agent: *\nDisallow: /*.pdf$', '/a/b.pdf'), false);
+  assert.equal(darf('User-agent: *\nDisallow: /*.pdf$', '/a/b.pdf?x'), true);
+  assert.equal(darf('User-agent: *\nDisallow: /a*b*c', '/axxbyyc/z'), false);
+  assert.equal(darf('User-agent: *\nDisallow: /ab*ba$', '/aba'), true);
+  assert.equal(darf('User-agent: *\nDisallow: /a**b', '/ab'), false);
+  assert.equal(darf('User-agent: *\nDisallow: /a$b', '/a$b'), false);
+});
+
+test('viele Sterne in einer Regel: schnell', () => {
+  const start = Date.now();
+  darf(`User-agent: *\nDisallow: /${'a*'.repeat(40)}b`, `/${'a'.repeat(3000)}`);
+  assert.ok(Date.now() - start < 200);
+});
+
+test('riesige robots.txt mit vielen Regeln: schnell, auch für viele Pfade', () => {
+  const robots = 'User-agent: *\n' + 'Disallow: /*q\n'.repeat(230_000);
+  const start = Date.now();
+  const gruppen = robotsGruppen(robots);
+  for (let i = 0; i < 1000; i++) robotsErlaubt(gruppen, EIGENE_NAMEN, `/seite-${i}`);
+  signale(robots);
+  assert.ok(Date.now() - start < 3000, `${Date.now() - start} ms`);
+});
+
+test('Sitemap-Zeile nach vielen Leerzeilen: schnell', () => {
+  const start = Date.now();
+  signale('\n'.repeat(2_000_000) + 'Sitemap: /karte.xml');
+  assert.ok(Date.now() - start < 1000);
+});
+
+test('Hunderttausende Sitemap-Zeilen: schnell, Standard-Adressen bleiben dabei', async () => {
+  const robots = Array.from({ length: 40_000 }, (_, i) => `Sitemap: /s${i}.xml`).join('\n');
+  const start = Date.now();
+  // Frist 0: nichts wird abgerufen, gemessen wird nur das Sammeln der Kandidaten.
+  const adressen = await fuerTests.sitemapAdressen(new URL('https://beispiel.example/'), robots, () => true, () => 0);
+  assert.deepEqual(adressen, []);
+  assert.ok(Date.now() - start < 1000, `${Date.now() - start} ms`);
+});

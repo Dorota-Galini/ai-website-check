@@ -1060,12 +1060,25 @@ function seiteAuswerten(geholt: Geholt, art: Art, s: Signale): Seite {
 
 type RobotsGruppe = { namen: string[]; regeln: { erlaubt: boolean; pfad: string }[] };
 
+// Seit 25.10.2026 Obergrenzen (Sicherheitsprüfung 25.10.2026, Fund 6): Eine
+// robots.txt mit Hunderttausenden Regeln, geprüft gegen jeden Link, kostete
+// Dutzende Sekunden. RFC 9309 verlangt von Lesern mindestens 500 KiB; was
+// darüber hinausgeht, und Regeln über diesen Grenzen, werden nicht gelesen.
+const ROBOTS_HOECHSTENS_ZEICHEN = 500_000;
+const ROBOTS_HOECHSTENS_REGELN = 2000;
+const REGEL_HOECHSTENS_ZEICHEN = 500;
+const PFAD_HOECHSTENS_ZEICHEN = 2048;
+let robotsZwischen: { text: string; gruppen: RobotsGruppe[] } | null = null;
+
 /** Gruppen einer robots.txt nach RFC 9309: Namen in Kleinbuchstaben, Regeln in der Reihenfolge der Datei. */
 function robotsGruppen(robots: string): RobotsGruppe[] {
+  // Dieselbe Datei wird für viele Leser gefragt (robotsAuswerten): einmal zerlegen.
+  if (robotsZwischen?.text === robots) return robotsZwischen.gruppen;
   const gruppen: RobotsGruppe[] = [];
   let aktuell: RobotsGruppe | null = null;
   let letzteWarAgent = false;
-  for (const roh of robots.split(/\r?\n/)) {
+  let regelZahl = 0;
+  for (const roh of robots.slice(0, ROBOTS_HOECHSTENS_ZEICHEN).split(/\r?\n/)) {
     const zeile = roh.replace(/#.*$/, '').trim();
     const m = zeile.match(/^([\w-]+)\s*:\s*(.*)$/);
     if (!m) continue;
@@ -1080,11 +1093,14 @@ function robotsGruppen(robots: string): RobotsGruppe[] {
       letzteWarAgent = true;
     } else if (feld === 'allow' || feld === 'disallow') {
       letzteWarAgent = false;
+      if (regelZahl >= ROBOTS_HOECHSTENS_REGELN || wert.length > REGEL_HOECHSTENS_ZEICHEN) continue;
+      regelZahl++;
       aktuell?.regeln.push({ erlaubt: feld === 'allow', pfad: wert });
     } else {
       letzteWarAgent = false;
     }
   }
+  robotsZwischen = { text: robots, gruppen };
   return gruppen;
 }
 
@@ -1117,6 +1133,8 @@ function regelPasst(muster: string, pfad: string): boolean {
  * Gleichstand Allow. „Disallow:“ ohne Pfad heißt: alles erlaubt.
  */
 function robotsErlaubt(gruppen: RobotsGruppe[], leser: string[], pfad: string): boolean {
+  // Überlange Adressen lesen wir ohnehin nicht (Fund 6).
+  if (pfad.length > PFAD_HOECHSTENS_ZEICHEN) return false;
   const namen = leser.map((l) => l.toLowerCase());
   const eigene = gruppen.filter((g) => g.namen.some((n) => namen.includes(n)));
   const regeln = (eigene.length ? eigene : gruppen.filter((g) => g.namen.includes('*'))).flatMap((g) => g.regeln);
@@ -1170,7 +1188,8 @@ async function linkStatus(start: URL): Promise<number> {
  */
 async function linksPruefen(alle: Verweis[], basis: URL, gelesen: Set<string>, s: Signale, erlaubt: (u: URL) => boolean, bis = Number.POSITIVE_INFINITY) {
   const ziele = new Map<string, { url: URL; text: string }>();
-  for (const v of alle) {
+  // Höchstens 300 Links ansehen, auch wenn viele gesperrt sind (Fund 6).
+  for (const v of alle.slice(0, 300)) {
     if ((v.url.protocol !== 'https:' && v.url.protocol !== 'http:') || !gleicherHost(v.url, basis)) continue;
     if (!erlaubt(v.url)) continue; // von der robots.txt gesperrt: nicht anfragen, nicht zählen
     if (/\.(pdf|jpe?g|png|gif|webp|svg|zip|docx?|xlsx?|mp4|mp3)$/i.test(v.url.pathname) || /wp-admin|wp-login|login|warenkorb|cart|feed/i.test(v.url.pathname)) continue;
@@ -1252,13 +1271,24 @@ async function sitemapAdressen(basis: URL, robots: string, erlaubt: (u: URL) => 
   // [ \t] statt \s: \s* lief über Zeilenumbrüche, viele Leerzeilen machten die
   // Suche quadratisch (Sicherheitsprüfung 25.10.2026, Fund 3).
   const kandidaten = [...robots.matchAll(/^[ \t]*sitemap[ \t]*:[ \t]*(\S+)/gim)].map((m) => m[1]);
-  kandidaten.push('/sitemap.xml', '/sitemap_index.xml');
+  // Seit 25.10.2026 mit Set und höchstens 10 Kandidaten: Abgerufen werden
+  // ohnehin nur 4, und offen.some() wuchs mit vielen Sitemap-Zeilen
+  // quadratisch (Sicherheitsprüfung 25.10.2026, Fund 7).
   const offen: URL[] = [];
-  for (const k of kandidaten) {
+  const gesehen = new Set<string>();
+  for (const k of kandidaten.slice(0, 50)) {
+    if (offen.length >= 10) break;
     try {
       const u = new URL(k, basis);
-      if (gleicherHost(u, basis) && erlaubt(u) && !offen.some((x) => x.href === u.href)) offen.push(u);
+      if (gesehen.has(u.href)) continue;
+      gesehen.add(u.href);
+      if (gleicherHost(u, basis) && erlaubt(u)) offen.push(u);
     } catch { /* kaputte Zeile in der robots.txt */ }
+  }
+  // Die zwei Standard-Adressen immer mit dabei, auch nach vielen Zeilen.
+  for (const pfad of ['/sitemap.xml', '/sitemap_index.xml']) {
+    const u = new URL(pfad, basis);
+    if (!gesehen.has(u.href) && erlaubt(u)) { gesehen.add(u.href); offen.push(u); }
   }
   const adressen: Verweis[] = [];
   for (let abrufe = 0; offen.length && abrufe < 4 && adressen.length < 500; abrufe++) {
@@ -1273,7 +1303,7 @@ async function sitemapAdressen(basis: URL, robots: string, erlaubt: (u: URL) => 
     const kopf = text.slice(0, 2000);
     if (/<sitemapindex\b/i.test(kopf)) {
       // Unterseiten-Sitemaps zuerst die mit Seiten, nicht Beiträge oder Bilder.
-      const kinder = aus(text).map((x) => { try { return new URL(x, u); } catch { return null; } })
+      const kinder = aus(text).slice(0, 200).map((x) => { try { return new URL(x, u); } catch { return null; } })
         .filter((x): x is URL => !!x && gleicherHost(x, basis) && erlaubt(x))
         .sort((a, b) => Number(/page|seite/i.test(b.pathname)) - Number(/page|seite/i.test(a.pathname)));
       offen.unshift(...kinder.slice(0, 2));
@@ -1440,6 +1470,7 @@ export async function sammeln(eingabe: string, optionen: { bis?: number } = {}):
   // Alte Seiten mit Frames: Der Inhalt steckt in den Rahmen, der wichtigste
   // heißt meist main, haupt oder content und steht oft als letzter da.
   const rahmen = [...startSeite.text.matchAll(/<(?:frame|iframe)\b[^>]*>/gi)]
+    .slice(0, 50)
     .map((m) => attribute(m[0]))
     .map((a) => { try { return { url: new URL(a.src ?? '', basis), haupt: /main|haupt|content|inhalt/i.test(`${a.name ?? ''} ${a.src ?? ''}`) }; } catch { return null; } })
     .filter((r): r is { url: URL; haupt: boolean } => !!r && !!r.url.pathname && gleicherHost(r.url, basis) && erlaubt(r.url) && !schon.has(r.url.href.replace(/\/+$/, '')))
