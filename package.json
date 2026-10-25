@@ -1,6 +1,6 @@
 {
   "name": "ai-website-check",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "An AI that walks through a small-business website like a customer and has to back every claim with a verbatim quote.",
