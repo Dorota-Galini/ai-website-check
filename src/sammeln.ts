@@ -1089,10 +1089,26 @@ function robotsGruppen(robots: string): RobotsGruppe[] {
 }
 
 /** Passt eine Regel auf den Pfad? „*“ steht für beliebig viele Zeichen, „$“ am Ende für das Ende. */
+// Seit 25.10.2026 ohne regulären Ausdruck: Ein Muster mit vielen „*“ ließ die
+// Suche exponentiell lange laufen (10 Sterne, 41 Zeichen: 10,6 s;
+// Sicherheitsprüfung 25.10.2026, Fund 2). Jedes Stück wird einmal von links
+// weiter gesucht; bei Mustern nur aus Text und „*“ ist das immer richtig.
 function regelPasst(muster: string, pfad: string): boolean {
   const amEnde = muster.endsWith('$');
-  const kern = (amEnde ? muster.slice(0, -1) : muster).split('*').map((t) => t.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*');
-  return new RegExp(`^${kern}${amEnde ? '$' : ''}`).test(pfad);
+  const teile = (amEnde ? muster.slice(0, -1) : muster).split('*');
+  const erstes = teile[0];
+  if (!pfad.startsWith(erstes)) return false;
+  if (teile.length === 1) return amEnde ? pfad === erstes : true;
+  let pos = erstes.length;
+  for (let i = 1; i < teile.length - 1; i++) {
+    if (!teile[i]) continue;
+    const fund = pfad.indexOf(teile[i], pos);
+    if (fund < 0) return false;
+    pos = fund + teile[i].length;
+  }
+  const letztes = teile[teile.length - 1];
+  if (!amEnde) return pfad.indexOf(letztes, pos) >= 0;
+  return pfad.length - letztes.length >= pos && pfad.endsWith(letztes);
 }
 
 /**
@@ -1233,7 +1249,9 @@ async function sitemapLesen(basis: URL, s: Signale, erlaubt: (u: URL) => boolean
  */
 async function sitemapAdressen(basis: URL, robots: string, erlaubt: (u: URL) => boolean, frist: () => number): Promise<Verweis[]> {
   const aus = (text: string) => [...text.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => zeichenLoesen(m[1]));
-  const kandidaten = [...robots.matchAll(/^\s*sitemap\s*:\s*(\S+)/gim)].map((m) => m[1]);
+  // [ \t] statt \s: \s* lief über Zeilenumbrüche, viele Leerzeilen machten die
+  // Suche quadratisch (Sicherheitsprüfung 25.10.2026, Fund 3).
+  const kandidaten = [...robots.matchAll(/^[ \t]*sitemap[ \t]*:[ \t]*(\S+)/gim)].map((m) => m[1]);
   kandidaten.push('/sitemap.xml', '/sitemap_index.xml');
   const offen: URL[] = [];
   for (const k of kandidaten) {
@@ -1409,7 +1427,7 @@ export async function sammeln(eingabe: string, optionen: { bis?: number } = {}):
   const regeln = robotsGruppen(robots);
   const erlaubt = (u: URL) => robotsErlaubt(regeln, eigeneNamen(), u.pathname + u.search);
   robotsAuswerten(robots, s);
-  if (/^\s*sitemap\s*:\s*\S/im.test(robots)) s.sitemap = true;
+  if (/^[ \t]*sitemap[ \t]*:[ \t]*\S/im.test(robots)) s.sitemap = true;
   s.adresse = basis.href;
   s.https = basis.protocol === 'https:';
   s.handyAnsicht = /<meta\b[^>]*name=["']?viewport/i.test(startSeite.text);
